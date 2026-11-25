@@ -1,35 +1,22 @@
-// A news-image-daily entry (Node 22, standard library only): the front page for
-// Tuesday 24 November 2026 lives in entry.b64.txt (base64 of a 1024x1024 JPEG),
-// and this program decodes it to /output/entry.png. The gate takes a whole PNG
-// or JPEG of at most 1 MiB and 1024 by 1024 pixels, and the judge sees exactly
-// the bytes written.
-//
-// All paths resolve from this file's own location (import.meta.url), never from
-// the working directory, so the program behaves identically from anywhere.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// main.ts — decode entry.b64.txt into /output/entry.png (Node 22 stdlib only).
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
-const b64Path = join(here, 'entry.b64.txt');
-const outPath = join(outDir, 'entry.png');
+const b64Path = join(here, "entry.b64.txt");
+const outPath = "/output/entry.png";
 
-// Read the single-line base64 payload next to this file.
-const b64 = readFileSync(b64Path, 'utf8').replace(/\s+/g, '');
-
-// Decode and guard: the payload must be a whole JPEG no larger than 1 MiB.
-const bytes = Buffer.from(b64, 'base64');
-if (bytes.length > 1024 * 1024) {
-  throw new Error(`entry image is ${bytes.length} bytes, over the 1 MiB cap`);
+const b64 = readFileSync(b64Path, "utf8").trim();
+const bytes = Buffer.from(b64, "base64");
+if (bytes.length === 0 || bytes.length > 1024 * 1024) {
+  throw new Error(`entry.png must be 1..1048576 bytes, got ${bytes.length}`);
 }
 if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) {
-  throw new Error('entry image is not a JPEG (missing FF D8 FF magic)');
+  throw new Error("entry.png is not a JPEG (bad magic bytes)");
 }
-
-mkdirSync(outDir, { recursive: true });
+mkdirSync("/output", { recursive: true });
 writeFileSync(outPath, bytes);
-console.log(`wrote ${outPath} (${bytes.length} bytes)`);
+const sha = createHash("sha256").update(bytes).digest("hex");
+console.log(`wrote ${outPath} (${bytes.length} bytes, sha256 ${sha})`);
